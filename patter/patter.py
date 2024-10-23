@@ -126,18 +126,35 @@ class Patter(object):
         if self.user:
             return self._get_channel_id_for_user(self.user)
 
-    def _get_channel_id_by_name(self, channel_name):
-        """Use this function to get an ID from a channel name.
+    def _get_channel_id_by_name(self, channel_display_name):
+        """Get the channel ID using the channel's display name.
 
-        :param channel_name: Name of channel
+        :param channel_display_name: Display name of the channel
         :returns: Channel id string.
-
+        :raises: MissingChannel.
         """
-        channel = self.mm_client.channels.get_channel_by_name_and_team_name(
-            team_name=self.team_name,
-            channel_name=channel_name,
-        )
-        return channel["id"]
+        # Get the team information
+        team = self.mm_client.teams.get_team_by_name(self.team_name)
+        team_id = team['id']
+    
+        # Initialize an empty list to store channels
+        channels = []
+    
+        # Fetch public channels
+        public_channels = self.mm_client.channels.get_public_channels(team_id=team_id, params={'per_page': 200})
+        channels.extend(public_channels)
+    
+        # Fetch private channels (if needed)
+        private_channels = self.mm_client.channels.get_channels_for_user(user_id=self.mm_client.user_id, team_id=team_id)
+        channels.extend(private_channels)
+    
+        # Search for the channel by display name
+        for channel in channels:
+            if channel['display_name'] == channel_display_name:
+                return channel['id']
+    
+        # If the channel is not found, raise an exception
+        raise MissingChannel(f"The channel '{channel_display_name}' does not exist.")
 
     def _get_channel_id_for_user(self, user_name):
         """Get the channel id for a direct message with the target user.
